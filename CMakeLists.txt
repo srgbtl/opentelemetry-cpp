@@ -87,13 +87,24 @@ else()
   )
 endif()
 
-if(NOT DEFINED CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 11)
-endif()
-
 option(WITH_STL "Whether to use Standard Library for C++latest features" OFF)
 
 option(WITH_ABSEIL "Whether to use Abseil for C++latest features" OFF)
+
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  if(WITH_STL)
+    # Require at least C++17. C++20 is needed to avoid gsl::span
+    if(CMAKE_VERSION VERSION_GREATER 3.11.999)
+      # Ask for 20, may get anything below
+      set(CMAKE_CXX_STANDARD 20)
+    else()
+      # Ask for 17, may get anything below
+      set(CMAKE_CXX_STANDARD 17)
+    endif()
+  else()
+    set(CMAKE_CXX_STANDARD 11)
+  endif()
+endif()
 
 if(WITH_ABSEIL)
   find_package(absl CONFIG REQUIRED)
@@ -101,6 +112,7 @@ if(WITH_ABSEIL)
   set(CORE_RUNTIME_LIBS absl::bad_variant_access absl::any absl::base
                         absl::bits absl::city)
 
+  add_definitions(-DHAVE_ABSEIL)
   # target_link_libraries(main PRIVATE absl::any absl::base absl::bits
   # absl::city)
 endif()
@@ -111,25 +123,24 @@ if(WITH_STL)
   # (absl::variant or std::variant) in variant unit test code is consistent with
   # the global project build definitions.
   add_definitions(-DHAVE_CPP_STDLIB)
-  add_definitions(-DHAVE_GSL)
-  # Require at least C++17. C++20 is needed to avoid gsl::span
-  if(CMAKE_VERSION VERSION_GREATER 3.11.999)
-    # Ask for 20, may get anything below
-    set(CMAKE_CXX_STANDARD 20)
-  else()
-    # Ask for 17, may get anything below
-    set(CMAKE_CXX_STANDARD 17)
-  endif()
 
-  # Guidelines Support Library path. Used if we are not on not get C++20.
-  #
-  # TODO: respect WITH_ABSEIL as alternate implementation of std::span
-  find_package(Microsoft.GSL QUIET)
-  if(TARGET Microsoft.GSL::GSL)
-    list(APPEND CORE_RUNTIME_LIBS Microsoft.GSL::GSL)
-  else()
-    set(GSL_DIR third_party/ms-gsl)
-    include_directories(${GSL_DIR}/include)
+  include(CheckIncludeFileCXX)
+  check_include_file_cxx(span HAVE_CXX20_SPAN)
+
+  if(NOT HAVE_CXX20_SPAN)
+    # Guidelines Support Library path. Used if we are not on not get C++20.
+    if (WITH_ABSEIL)
+      list(APPEND CORE_RUNTIME_LIBS absl::span)
+    else()
+      find_package(Microsoft.GSL QUIET)
+      if(TARGET Microsoft.GSL::GSL)
+        list(APPEND CORE_RUNTIME_LIBS Microsoft.GSL::GSL)
+      else()
+        set(GSL_DIR third_party/ms-gsl)
+        include_directories(${GSL_DIR}/include)
+      endif()
+      add_definitions(-DHAVE_GSL)
+    endif()
   endif()
 
   # Optimize for speed to reduce the hops

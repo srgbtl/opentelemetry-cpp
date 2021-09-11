@@ -45,6 +45,18 @@ using span = gsl::span<ElementType, Extent>;
 }  // namespace nostd
 OPENTELEMETRY_END_NAMESPACE
 #    define HAVE_SPAN
+#  else if defined(HAVE_ABSEIL)
+#    include <absl/types/span.h>
+OPENTELEMETRY_BEGIN_NAMESPACE
+namespace nostd
+{
+constexpr std::size_t dynamic_extent = (std::numeric_limits<std::size_t>::max());
+
+template <class ElementType, std::size_t Extent = nostd::dynamic_extent>
+using span = absl::span<std::enable_if<Extent == nostd::dynamic_extent, ElementType>::type>;
+}  // namespace nostd
+OPENTELEMETRY_END_NAMESPACE
+#    define HAVE_SPAN
 #  else
 // No `gsl::span`, no `std::span`, fallback to `nostd::span`
 #  endif

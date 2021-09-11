@@ -80,7 +80,7 @@ class PropertyValue : public PropertyVariant
    * @return
    */
   template <typename T>
-  static std::vector<T> to_vector(const nostd::span<const T, nostd::dynamic_extent> &source)
+  static std::vector<T> to_vector(const nostd::span<const T> &source)
   {
     return std::vector<T>(source.begin(), source.end());
   };
